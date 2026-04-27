@@ -1,7 +1,33 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useState } from "react";
 import { getGeminiResponse } from "../config/gemini";
 
 export const Context = createContext();
+
+// Converts Gemini's markdown response to clean HTML
+const formatResponse = (text) => {
+  // Remove leading commas or stray punctuation at the start
+  text = text.replace(/^[\s,]+/, "");
+
+  // Convert **bold** to <b>bold</b>
+  text = text.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+
+  // Convert *italic* to <i>italic</i>
+  text = text.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, "<i>$1</i>");
+
+  // Convert markdown bullet points (* item or - item) to <li> items
+  text = text.replace(/^[\*\-] (.+)$/gm, "<li>$1</li>");
+  text = text.replace(/(<li>.*<\/li>\n?)+/gs, (match) => `<ul>${match}</ul>`);
+
+  // Convert headings
+  text = text.replace(/^### (.+)$/gm, "<h3>$1</h3>");
+  text = text.replace(/^## (.+)$/gm, "<h2>$1</h2>");
+  text = text.replace(/^# (.+)$/gm, "<h1>$1</h1>");
+
+  // Convert newlines to <br>
+  text = text.replace(/\n(?!<\/?(ul|li|h[123]|br))/g, "<br>");
+
+  return text;
+};
 
 const ContextProvider = (props) => {
   const [input, setInput] = useState("");
@@ -22,17 +48,14 @@ const ContextProvider = (props) => {
     setLoading(true);
     setResultData("");
     setShowResult(true);
-    setRecentPrompt(input);
     setRecentPrompt(currentPrompt);
     setPreviousPrompts((prev) => [...prev, currentPrompt]);
 
     try {
       const response = await getGeminiResponse(currentPrompt);
-      setResultData(response);
+      const formatted = formatResponse(response);
+      setResultData(formatted);
       setInput("");
-      setLoading(false);
-      setInput("");
-      console.log(response);
     } catch (error) {
       console.error("Error in onSent:", error);
       setResultData(
@@ -57,12 +80,11 @@ const ContextProvider = (props) => {
     resultData,
     setResultData,
     onSent,
-    setShowResult,
   };
 
   return (
     <Context.Provider value={contextValue}>{props.children}</Context.Provider>
   );
 };
-// onSent("What is react.js?");
+
 export default ContextProvider;

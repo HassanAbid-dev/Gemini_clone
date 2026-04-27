@@ -1,31 +1,35 @@
-import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
-
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
 if (!apiKey) {
-  console.error("Set environment variable: export GEMINI_API_KEY=your_key");
-  throw new Error("GEMINI_API_KEY not found");
+  console.warn(
+    "Warning: VITE_GEMINI_API_KEY is not set. Please add it to your .env file.",
+  );
 }
-
-console.log("API Key loaded successfully");
-
-const ai = new GoogleGenAI({ apiKey });
-
 export async function getGeminiResponse(prompt) {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-    });
-    return response.text;
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemma-3-27b-it",
+          messages: [{ role: "user", content: prompt }],
+        }),
+      },
+    );
+
+    const data = await response.json();
+    console.log("Response:", data);
+
+    if (data.error) throw new Error(data.error.message);
+    return data.choices[0].message.content;
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
+    console.error("Error calling API:", error);
     throw error;
   }
 }
 
-// Default export for backward compatibility
-export default async function main(prompt = "What is react.js?") {
-  return await getGeminiResponse(prompt);
-}
+export default getGeminiResponse;
